@@ -1,4 +1,4 @@
-# Spotify Advanced SQL Project and Query Optimization P-6
+# Spotify Advanced SQL Project and Query Optimization 
 Project Category: Advanced
 [Click Here to get Dataset](https://www.kaggle.com/datasets/sanjanchaudhari/spotify-dataset)
 
@@ -69,43 +69,179 @@ In advanced stages, the focus shifts to improving query performance. Some optimi
 ## 15 Practice Questions
 
 ### Easy Level
-1. Retrieve the names of all tracks that have more than 1 billion streams.
-2. List all albums along with their respective artists.
-3. Get the total number of comments for tracks where `licensed = TRUE`.
-4. Find all tracks that belong to the album type `single`.
-5. Count the total number of tracks by each artist.
+1. **Retrieve the names of all tracks that have more than 1 billion streams.**
+```sql
+SELECT 
+	* 
+FROM spotify
+WHERE stream > 1000000000;
+```
+
+2. **List all albums along with their respective artists.**
+```sql
+SELECT
+	DISTINCT album,
+	artist
+FROM Spotify
+ORDER BY 1;
+```
+
+3. **Get the total number of comments for tracks where `licensed = TRUE`.**
+```sql
+SELECT
+	SUM(comments) as total_comments
+FROM spotify
+WHERE licensed = 'TRUE';
+```
+
+4. **Find all tracks that belong to the album type `single`.**
+```sql
+SELECT *
+FROM Spotify
+WHERE
+  album_type = 'single';
+```
+
+5. **Count the total number of tracks by each artist.**
+```sql
+SELECT
+	artist,
+	count(track) as total_tracks
+FROM Spotify
+GROUP BY 1
+ORDER BY 2;
+```
 
 ### Medium Level
-1. Calculate the average danceability of tracks in each album.
-2. Find the top 5 tracks with the highest energy values.
-3. List all tracks along with their views and likes where `official_video = TRUE`.
-4. For each album, calculate the total views of all associated tracks.
-5. Retrieve the track names that have been streamed on Spotify more than YouTube.
-
-### Advanced Level
-1. Find the top 3 most-viewed tracks for each artist using window functions.
-2. Write a query to find tracks where the liveness score is above the average.
-3. **Use a `WITH` clause to calculate the difference between the highest and lowest energy values for tracks in each album.**
+6. **Calculate the average danceability of tracks in each album.**
 ```sql
-WITH cte
-AS
-(SELECT 
-	album,
-	MAX(energy) as highest_energy,
-	MIN(energy) as lowest_energery
-FROM spotify
-GROUP BY 1
-)
 SELECT 
 	album,
-	highest_energy - lowest_energery as energy_diff
-FROM cte
+	avg(danceability) as avg_dancebility
+FROM spotify
+GROUP BY 1
+ORDER BY 2 desc;
+```
+
+7.**Find the top 5 tracks with the highest energy values.**
+```sql
+SELECT
+	track,
+	MAX(energy) as max_emergy
+FROM Spotify
+GROUP BY 1
 ORDER BY 2 DESC
+LIMIT 5;
+```
+
+8. **List all tracks along with their views and likes where `official_video = TRUE`.**
+```sql
+SELECT
+	track,
+	SUM(views) as total_views,
+	SUM(likes) as total_likes
+FROM Spotify
+WHERE Official_video = 'TRUE'
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 5;
+```
+
+9. **For each album, calculate the total views of all associated tracks.**
+```sql
+SELECT
+	track,
+	album,
+	SUM(views) as total_views
+FROM Spotify
+GROUP BY 1,2
+ORDER BY 3 DESC;
+```
+
+10. **Retrieve the track names that have been streamed on Spotify more than YouTube.**
+```sql
+SELECT * FROM
+(SELECT 
+	track,
+	--most_played_on
+	COALESCE(SUM(CASE WHEN most_played_on = 'Youtube' THEN stream END),0) as streamd_on_youtube,
+	COALESCE(SUM(CASE WHEN most_played_on = 'Spotify' THEN stream END),0) as streamed_on_spotify
+	FROM Spotify
+GROUP BY 1
+) as t1
+WHERE 
+	streamed_on_spotify > streamd_on_youtube
+	AND
+	streamd_on_youtube <> 0
+```
+
+
+### Advanced Level
+11. **Find the top 3 most-viewed tracks for each artist using window functions.**
+```sql
+With ranking_artist
+AS(
+SELECT 
+	track,
+	artist,
+	SUM(views) as total_views,
+	DENSE_RANK() OVER( PARTITION BY artist ORDER BY SUM(views) DESC) AS DN_RANK
+FROM Spotify
+GROUP BY 1,2
+ORDER BY 1,3 DESC
+) 
+SELECT * FROM ranking_artist
+WHERE DN_RANK <= 3;
+```
+
+12. Write a query to find tracks where the liveness score is above the average.
+```sql
+SELECT
+	track,
+	liveness
+FROM spotify
+WHERE
+	liveness > (select avg(liveness) from spotify);
+
+-- [select avg(liveness) as averaged from spotify =0.1936__]
+```
+
+13. **Use a `WITH` clause to calculate the difference between the highest and lowest energy values for tracks in each album.**
+```sql
+WITH energy_table
+as(SELECT 
+	album,
+	MAX(energy) as highest_energy_value,
+	MIN(energy) as lowest_energy_value
+FROM Spotify
+group by 1
+)
+  SELECT
+  	album,
+ 	highest_energy_value - lowest_energy_value as energy_diff
+  FROM energy_table
+ORDER BY 2 DESC;
 ```
    
-5. Find tracks where the energy-to-liveness ratio is greater than 1.2.
-6. Calculate the cumulative sum of likes for tracks ordered by the number of views, using window functions.
+14. **Find tracks where the energy-to-liveness ratio is greater than 1.2.**
+```sql
+SELECT track,
+	   energy,
+	   liveness,
+       (energy/liveness) AS energy_liveness_ratio
+FROM spotify
+WHERE (energy/liveness) > 1.2;
+```
 
+15. **Calculate the cumulative sum of likes for tracks ordered by the number of views, using window functions.**
+```sql
+SELECT track,
+       views,
+       likes,
+       ROW_NUMBER() OVER (ORDER BY views) AS view_rank,
+       SUM(likes) OVER (ORDER BY views) AS cumulative_likes
+FROM Spotify;
+```
 
 Here’s an updated section for your **Spotify Advanced SQL Project and Query Optimization** README, focusing on the query optimization task you performed. You can include the specific screenshots and graphs as described.
 
@@ -113,15 +249,32 @@ Here’s an updated section for your **Spotify Advanced SQL Project and Query Op
 
 ## Query Optimization Technique 
 
+```sql
+EXPLAIN ANALYZE -- et 2.561 ms pt 0.183 ms
+
+SELECT
+	artist,
+	track,
+	views
+FROM Spotify
+WHERE artist = 'Gorillz'
+	  AND
+	  most_played_on = 'Youtube'
+ORDER BY stream DESC LIMIT 5;
+```
+
+```sql
+CREATE INDEX artist_index on spotify(artist);
+```
 To improve query performance, we carried out the following optimization process:
 
 - **Initial Query Performance Analysis Using `EXPLAIN`**
     - We began by analyzing the performance of a query using the `EXPLAIN` function.
     - The query retrieved tracks based on the `artist` column, and the performance metrics were as follows:
-        - Execution time (E.T.): **7 ms**
-        - Planning time (P.T.): **0.17 ms**
+        - Execution time (E.T.): **39.33 ms**
+        - Planning time (P.T.): **2.625 ms**
     - Below is the **screenshot** of the `EXPLAIN` result before optimization:
-      ![EXPLAIN Before Index](https://github.com/najirh/najirh-Spotify-Data-Analysis-using-SQL/blob/main/spotify_explain_before_index.png)
+      ![EXPLAIN Before Index]![Spotify _before _index_explain](https://github.com/user-attachments/assets/2bc40e65-f0ea-4688-be54-dfbbd967a57c)
 
 - **Index Creation on the `artist` Column**
     - To optimize the query performance, we created an index on the `artist` column. This ensures faster retrieval of rows where the artist is queried.
@@ -132,47 +285,21 @@ To improve query performance, we carried out the following optimization process:
 
 - **Performance Analysis After Index Creation**
     - After creating the index, we ran the same query again and observed significant improvements in performance:
-        - Execution time (E.T.): **0.153 ms**
-        - Planning time (P.T.): **0.152 ms**
+        - Execution time (E.T.): **2.561 ms**
+        - Planning time (P.T.): **0.183 ms**
     - Below is the **screenshot** of the `EXPLAIN` result after index creation:
-      ![EXPLAIN After Index](https://github.com/najirh/najirh-Spotify-Data-Analysis-using-SQL/blob/main/spotify_explain_after_index.png)
+      ![EXPLAIN After Index]![Spotify explain after index view](https://github.com/user-attachments/assets/5df76086-f4aa-4419-a8e8-504b93774de0)
 
 - **Graphical Performance Comparison**
     - A graph illustrating the comparison between the initial query execution time and the optimized query execution time after index creation.
     - **Graph view** shows the significant drop in both execution and planning times:
-      ![Performance Graph](https://github.com/najirh/najirh-Spotify-Data-Analysis-using-SQL/blob/main/spotify_graphical%20view%203.png)
-      ![Performance Graph](https://github.com/najirh/najirh-Spotify-Data-Analysis-using-SQL/blob/main/spotify_graphical%20view%202.png)
-      ![Performance Graph](https://github.com/najirh/najirh-Spotify-Data-Analysis-using-SQL/blob/main/spotify_graphical%20view%201.png)
+      ![Performance Graph]![Spotify-Graphical view](https://github.com/user-attachments/assets/1f4f203f-92cd-43e0-bd81-50c96b2004ce)
+      ![Performance Graph]![Spotify-Graphical view 1](https://github.com/user-attachments/assets/228492c7-3bd6-421c-bca0-2acfb763eea2)
+      ![Performance Graph]![Spotify graphical view-2](https://github.com/user-attachments/assets/afbd330d-8235-40a8-a9ac-3687af5843ae)
+
 
 This optimization shows how indexing can drastically reduce query time, improving the overall performance of our database operations in the Spotify project.
 ---
 
-## Technology Stack
-- **Database**: PostgreSQL
-- **SQL Queries**: DDL, DML, Aggregations, Joins, Subqueries, Window Functions
-- **Tools**: pgAdmin 4 (or any SQL editor), PostgreSQL (via Homebrew, Docker, or direct installation)
 
-## How to Run the Project
-1. Install PostgreSQL and pgAdmin (if not already installed).
-2. Set up the database schema and tables using the provided normalization structure.
-3. Insert the sample data into the respective tables.
-4. Execute SQL queries to solve the listed problems.
-5. Explore query optimization techniques for large datasets.
-
----
-
-## Next Steps
-- **Visualize the Data**: Use a data visualization tool like **Tableau** or **Power BI** to create dashboards based on the query results.
-- **Expand Dataset**: Add more rows to the dataset for broader analysis and scalability testing.
-- **Advanced Querying**: Dive deeper into query optimization and explore the performance of SQL queries on larger datasets.
-
----
-
-## Contributing
-If you would like to contribute to this project, feel free to fork the repository, submit pull requests, or raise issues.
-
----
-
-## License
-This project is licensed under the MIT License.
 
